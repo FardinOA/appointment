@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search } from "lucide-react";
+import { Calendar1Icon, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import debounce from "lodash/debounce";
 import { CreateAppointment } from "../appointment/create-appointment";
 
-interface User {
+export interface User {
     id: string;
     name: string;
     email: string;
@@ -147,6 +147,11 @@ export default function UsersPage() {
                                     <CreateAppointment
                                         userId={user?.id}
                                         userName={user?.name}
+                                        triggerButton={
+                                            <Button size="icon">
+                                                <Calendar1Icon className="h-4 w-4  " />
+                                            </Button>
+                                        }
                                     />
                                 </TableCell>
                             </TableRow>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, LayoutDashboard, Users } from "lucide-react";
+import { LayoutDashboard, Users } from "lucide-react";
 
 import {
     Sidebar,
@@ -22,7 +22,6 @@ const data = {
     navItems: [
         { title: "Dashboard", icon: LayoutDashboard, url: "/" },
         { title: "Users", icon: Users, url: "/user" },
-        { title: "Appointment", icon: Calendar, url: "/appointments" },
     ],
 };
 

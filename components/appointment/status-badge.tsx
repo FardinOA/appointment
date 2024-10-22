@@ -14,7 +14,12 @@ export default function StatusBadge({
     };
 
     return (
-        <Badge className={cn("capitalize", statusColors[status])}>
+        <Badge
+            className={cn(
+                "capitalize pointer-events-none",
+                statusColors[status]
+            )}
+        >
             {/* {status.charAt(0).toUpperCase() + status.slice(1)} */}
             {status}
         </Badge>

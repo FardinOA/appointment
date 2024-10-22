@@ -13,12 +13,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppointmentList from "./appointment-list";
 import LoadingSkeleton from "./loading-skeleton";
+import { CreateAppointment } from "./create-appointment";
 
 export type Appointment = {
     id: string;
@@ -26,7 +27,7 @@ export type Appointment = {
     date: string;
     time: string;
     status: "pending" | "accept" | "decline" | "cancel";
-    audioMessage?: string;
+    audio_message?: string;
     isUpcoming: boolean;
     user_ids: string[];
     created_by: string;
@@ -46,7 +47,6 @@ export default function AppointmentManagement() {
     const supabase = createClientComponentClient();
 
     const fetchAppointments = useCallback(async () => {
-        const isUpcoming = activeTab === "upcoming";
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         const endIndex = startIndex + ITEMS_PER_PAGE - 1;
 
@@ -60,24 +60,14 @@ export default function AppointmentManagement() {
                 `title.ilike.%${searchTerm}%,date.ilike.%${searchTerm}%,time.ilike.%${searchTerm}%`
             );
         }
-        const now = new Date().toISOString();
-        const [currentDate, currentTime] = now.split("T");
-        if (isUpcoming) {
-            query = query.or(
-                `date.gt.${currentDate},and(date.eq.${currentDate},time.gte.${currentTime})`
-            );
-        } else {
-            query = query.or(
-                `date.lt.${currentDate},or(date.eq.${currentDate},time.lt.${currentTime})`
-            );
-        }
 
         if (statusFilter) {
             query = query.eq("status", statusFilter);
         }
 
         const { data, error, count } = await query
-            .order("date", { ascending: isUpcoming })
+            .order("date", { ascending: true })
+            .order("time", { ascending: true })
             .range(startIndex, endIndex);
 
         if (error) {
@@ -87,7 +77,26 @@ export default function AppointmentManagement() {
             setTotalCount(count || 0);
         }
         setInitialLoad(false);
-    }, [activeTab, currentPage, supabase, user?.id, searchTerm, statusFilter]);
+    }, [currentPage, supabase, user?.id, searchTerm, statusFilter]);
+
+    useEffect(() => {
+        // Set up the real-time subscription
+        const subscription = supabase
+            .channel("schema-db-changes")
+            .on(
+                "postgres_changes",
+                { event: "INSERT", schema: "public", table: "appointment" },
+                () => {
+                    fetchAppointments();
+                }
+            )
+            .subscribe();
+
+        // Cleanup subscription on component unmount
+        return () => {
+            supabase.removeChannel(subscription);
+        };
+    }, []);
 
     useEffect(() => {
         fetchAppointments();
@@ -117,38 +126,70 @@ export default function AppointmentManagement() {
     );
 
     const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+    const filterAppointments = (
+        appointments: Appointment[],
+        isUpcoming: boolean
+    ) => {
+        const now = new Date();
+
+        return appointments.filter((appointment: Appointment) => {
+            const appointmentDateTime = new Date(
+                `${appointment.date}T${appointment.time}`
+            );
+
+            // Filter upcoming appointments if isUpcoming is true
+            if (isUpcoming) {
+                return appointmentDateTime > now;
+            }
+
+            // Filter past appointments if isUpcoming is false
+            return appointmentDateTime <= now;
+        });
+    };
 
     return (
         <div className="container mx-auto p-4">
             <h1 className="text-2xl font-bold mb-4">Appointment Management</h1>
-            <div className="flex flex-col sm:flex-row gap-4 mb-4 w-full">
-                <div className="mb-4 relative w-full">
-                    <Input
-                        type="text"
-                        placeholder="Search appointments..."
-                        onChange={(e) => debouncedSearch(e.target.value)}
-                        className="w-full pl-10"
-                    />
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400  " />
+            <div className="flex flex-col md:flex-row md:justify-between gap-4 mb-4 w-full   ">
+                <div className="w-full lg:w-[80%] flex flex-col md:flex-row gap-4 ">
+                    <div className="mb-4 relative w-full">
+                        <Input
+                            type="text"
+                            placeholder="Search appointments..."
+                            onChange={(e) => debouncedSearch(e.target.value)}
+                            className="w-full pl-10"
+                        />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400  " />
+                    </div>
+                    <Select
+                        value={statusFilter || "all"}
+                        onValueChange={(value) => {
+                            setStatusFilter(
+                                value === "all" ? undefined : value
+                            );
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={"all"}>All statuses</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="accept">Accepted</SelectItem>
+                            <SelectItem value="decline">Declined</SelectItem>
+                            <SelectItem value="cancel">Cancelled</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
-                <Select
-                    value={statusFilter || "all"}
-                    onValueChange={(value) => {
-                        setStatusFilter(value === "all" ? undefined : value);
-                        setCurrentPage(1);
-                    }}
-                >
-                    <SelectTrigger className="w-full sm:w-[180px]">
-                        <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={"all"}>All statuses</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="accept">Accepted</SelectItem>
-                        <SelectItem value="decline">Declined</SelectItem>
-                        <SelectItem value="cancel">Cancelled</SelectItem>
-                    </SelectContent>
-                </Select>
+
+                <CreateAppointment
+                    triggerButton={
+                        <Button>
+                            <Plus className="size-4" /> Create
+                        </Button>
+                    }
+                />
             </div>
             <Tabs
                 value={activeTab}
@@ -169,7 +210,10 @@ export default function AppointmentManagement() {
                         <AppointmentList
                             userId={user?.id}
                             isUpcoming={true}
-                            appointments={appointments}
+                            appointments={filterAppointments(
+                                appointments,
+                                true
+                            )}
                             onAction={handleAppointmentAction}
                         />
                     )}
@@ -180,7 +224,10 @@ export default function AppointmentManagement() {
                     ) : (
                         <AppointmentList
                             userId={user?.id}
-                            appointments={appointments}
+                            appointments={filterAppointments(
+                                appointments,
+                                false
+                            )}
                             onAction={handleAppointmentAction}
                         />
                     )}

@@ -26,7 +26,7 @@ export default function Main({ children }: { children: ReactNode }) {
             };
             dispatch(saveUser(obj));
         } catch (error) {
-            console.log("error", error);
+            throw error;
         }
     };
 

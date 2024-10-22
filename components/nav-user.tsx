@@ -27,7 +27,6 @@ export function NavUser() {
     const { isMobile } = useSidebar();
     const { user } = useSelector((state: RootState) => state?.user);
 
-    console.log(user);
     const supabase = createClientComponentClient();
     const logoutHandler = async () => {
         const { error } = await supabase.auth.signOut();
