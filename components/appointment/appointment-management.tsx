@@ -99,7 +99,7 @@ export default function AppointmentManagement() {
     }, []);
 
     useEffect(() => {
-        fetchAppointments();
+        if (user?.id) fetchAppointments();
     }, [fetchAppointments]);
 
     const handleAppointmentAction = async (
